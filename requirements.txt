@@ -1,0 +1,5 @@
+aptos_sdk
+requests
+loguru
+ua_generator
+aiohttp_socks
