@@ -2,24 +2,44 @@ import threading
 import asyncio
 from loguru import logger
 from aptos_sdk.account import Account
+from aptos_sdk.async_client import ResourceNotFound
 from src.services.transaction import TransactionService
 from src.services.mercato import Mercato
 from src.services.wapal import Wapal
 from src.services.twitter import Twitter
+from src.services.galxe import Galxe
+from src.services.topaz import Topaz
 
-from config import ACCOUNTS, MERCATO_COLLECTION_ID
+from src.clients.aptos_client import client
+
+from config import ACCOUNTS, PROXIES, TWITTERS, EVM
 
 async def process_account(pk, idx):
-    logger.info(f"Account {idx} started execution")
-    proxy = ""
-    auth_token = ""
+    logger.info(f"Account {idx + 1} started execution")
+    account = Account.load_key(pk)
+    try:
+        await client.account_balance(account.address())
+    except ResourceNotFound as e:
+        print(f"Address {account.address()} Account #{idx + 1} has no aptos")
+        return
+
+    proxy = PROXIES[idx] if 0 <= idx < len(PROXIES) else None
+    auth_token = TWITTERS[idx]
+    evm_pk = EVM[idx]
 
     account = Account.load_key(pk)
-    merkato = Mercato(account, MERCATO_COLLECTION_ID)
+
+    merkato = Mercato(account)
+    topaz = Topaz(account)
     wapal = Wapal(account)
     twitter = Twitter(auth_token, proxy)
+    galxe = Galxe(auth_token, evm_pk)
 
-    wapal.mint()
+    await wapal.mint()
+    await merkato.bid()
+    await topaz.bid()
+
+    await galxe.bind_twitter()
 
     await twitter.start()
     await twitter.follow('BlueMove_OA')
@@ -27,23 +47,12 @@ async def process_account(pk, idx):
     await twitter.follow('TopazMarket')
     await twitter.follow('Mercato_xyz')
 
-    merkato.mint()
-
-def start_loop(loop):
-    asyncio.set_event_loop(loop)
-    loop.run_forever()
-
-def run_async(account, index):
-    new_loop = asyncio.new_event_loop()
-    asyncio.run(process_account(account, index))
-
+async def main():
+    tasks = []
+    for index, account in enumerate(ACCOUNTS):
+        task = process_account(account, index)
+        tasks.append(task)
+    await asyncio.gather(*tasks)
 
 if __name__ == '__main__':
-    threads = []
-    for index, account in enumerate(ACCOUNTS):
-        thread = threading.Thread(target=run_async, args=(account, index + 1))
-        thread.start()
-        threads.append(thread)
-
-    for thread in threads:
-        thread.join()
+    asyncio.run(main())

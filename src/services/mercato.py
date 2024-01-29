@@ -1,4 +1,10 @@
+## B0R9F3D9
+
 from loguru import logger
+from random import choice, randint
+
+from aptos_sdk.account import AccountAddress
+from aptos_sdk.transactions import TransactionArgument, Serializer, EntryFunction, AccountAddress
 
 from src.clients.graphql_client import GraphQLClient
 from src.clients.queries import FETCH_EDITION_LAUNCH_BY_ID
@@ -9,15 +15,45 @@ from src.services.transaction import TransactionService
 
 from src.utils.strings import generate_random_string
 
-from config import INDEXER_XYZ_API_URL, INDEXER_AUTH_PAYLOAD, MERCATO_API_URL
+from config import INDEXER_XYZ_API_URL, INDEXER_AUTH_PAYLOAD, MERCATO_API_URL, MERCATO_BID_CONTRACT_V2, MERCATO_BID_CONTRACT_V1, BID_NFTS, MERCATO_COLLECTION_ID
 
 class Mercato:
-    def __init__(self, account, collection_id):
+    def __init__(self, account, collection_id=MERCATO_COLLECTION_ID):
         self.account = account
         self.collection_id = collection_id
         self.graphql_client = GraphQLClient(INDEXER_XYZ_API_URL)
         self.transaction_service = TransactionService(account)
-        
+
+    async def bid(self):
+        nft_name = choice(list(BID_NFTS.keys()))
+        nft_address = BID_NFTS[nft_name]
+        nft_address = AccountAddress.from_str(nft_address)
+        bid_amount = randint(88, 345)
+        bid_quantity = 1
+
+        args = [
+            TransactionArgument(nft_address, Serializer.struct),
+            TransactionArgument(bid_amount, Serializer.u64),
+            TransactionArgument(bid_quantity, Serializer.u64),
+        ]
+
+        if 'V2' in nft_name:
+            contract = MERCATO_BID_CONTRACT_V2
+            func = 'collection_bids'
+        else:
+            args.insert(1, TransactionArgument(nft_name, Serializer.str))
+            contract = MERCATO_BID_CONTRACT_V1
+            func = 'collection_bid'
+
+        payload = EntryFunction.natural(
+            module=contract,
+            function=func,
+            ty_args=[],
+            args=args
+        )
+
+        raw_txn = await self.transaction_service.get_raw_txn(payload)
+        await self.transaction_service.send_txn(raw_txn)
 
     def fetch_edition_launch_by_id(self):
         response = self.graphql_client.execute_query(

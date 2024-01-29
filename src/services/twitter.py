@@ -47,6 +47,8 @@ class Twitter:
         self.cookies = {'auth_token': auth_token, 'ct0': ''}
         self.headers = get_headers()
         self.proxy = proxy
+        self.proxy = None if self.proxy is None else f"http://{self.proxy}"
+
 
     @async_retry
     async def request(self, method, url, acceptable_statuses=None, resp_handler=None, with_text=False, **kwargs):

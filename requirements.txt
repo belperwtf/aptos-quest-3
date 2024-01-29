@@ -1,4 +1,4 @@
-aptos_sdk
+aptos-sdk==0.7.1
 requests
 loguru
 ua_generator
