@@ -28,3 +28,5 @@
 
 ## Запуск
 <code>python main.py</code>
+
+# Не будь тюбиком, подпишись на старого https://t.me/belper_crypto
